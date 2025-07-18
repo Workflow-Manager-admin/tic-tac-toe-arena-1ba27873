@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
+import SnakeLadderGame from "./SnakeLadderGame";
 
 /**
  * PUBLIC_INTERFACE
- * Main App component for Tic Tac Toe game.
- * - Supports single player (vs AI) and two-player local mode.
- * - Light, modern, minimalistic UI with responsive/centered layout.
- * - Win/draw detection, simple restart and new game flow.
+ * Main App component - Tic Tac Toe or Snake & Ladder entry.
+ * Switches between the 2 games, holding menus and UI routing.
  */
 function App() {
   const COLORS = {
@@ -19,27 +18,30 @@ function App() {
   };
 
   const [theme, setTheme] = useState("light");
+  // App-level game selector: "menu" = select, "ttt" = tic tac toe, "snl" = snake & ladder
+  const [appScreen, setAppScreen] = useState("menu");
+
+  // --- Tic Tac Toe state ---
   const [gameMode, setGameMode] = useState(null); // "ai" or "local"
   const [board, setBoard] = useState(Array(9).fill(null));
   const [xIsNext, setXIsNext] = useState(true);
   const [status, setStatus] = useState(""); // "X wins", "O wins", "Draw", or ""
   const [animWinLine, setAnimWinLine] = useState(null);
 
-  // Applies light theme at root
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
-  // Reset board and state for new game
   function startNewGame(mode) {
     setGameMode(mode);
     setBoard(Array(9).fill(null));
     setXIsNext(true);
     setStatus("");
     setAnimWinLine(null);
+    setAppScreen("ttt");
   }
 
-  // Get winner and winning cells, or null if none. If draw, returns "draw".
+  // TicTacToe helpers
   function calculateWinner(b) {
     const lines = [
       [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -56,7 +58,6 @@ function App() {
     return null;
   }
 
-  // Move handler
   function handleClick(idx) {
     if (board[idx] || status) return;
     const newBoard = board.slice();
@@ -76,12 +77,10 @@ function App() {
     }
   }
 
-  // AI move: pick random empty spot (can improve to minimax later)
   function makeAIMove() {
     if (status || gameMode !== "ai" || xIsNext) return; // AI is always "O"
     const empty = board.map((v, i) => (v ? null : i)).filter((v) => v !== null);
     if (empty.length === 0) return;
-    // 500ms delay for realism
     setTimeout(() => {
       const choice = empty[Math.floor(Math.random() * empty.length)];
       handleClick(choice);
@@ -131,20 +130,35 @@ function App() {
     setTheme((t) => (t === "light" ? "dark" : "light"));
   }
 
-  const Board = () => (
-    <div className="ttt-board" role="grid" aria-label="Game board">
-      {[0, 1, 2].map((r) => (
-        <div className="ttt-row" key={"row" + r} role="row">
-          {[0, 1, 2].map((c) => renderSquare(r * 3 + c))}
+  // Main Menu: choose TicTacToe or SnakeLadder
+  function MainMenu() {
+    return (
+      <div className="ttt-menu" style={{ marginBottom: 32 }}>
+        <h1 className="ttt-title" style={{ color: COLORS.primary, letterSpacing: 1, fontSize: '2.25rem', marginBottom: 16 }}>Game Arena</h1>
+        <div className="ttt-select-mode" style={{ marginBottom: 28 }}>
+          <button
+            className="ttt-btn"
+            style={{ background: COLORS.primary, color: "#fff", marginRight: 10 }}
+            onClick={() => setAppScreen("ttt")}
+          >
+            Play Tic Tac Toe
+          </button>
+          <button
+            className="ttt-btn"
+            style={{ background: COLORS.accent, color: "#222", marginRight: 10 }}
+            onClick={() => setAppScreen("snl")}
+          >
+            Snake &amp; Ladder
+          </button>
         </div>
-      ))}
-      {animWinLine && (
-        <div className={`ttt-anim-line ttt-line-${animWinLine[0]}-${animWinLine[2]}`} />
-      )}
-    </div>
-  );
+        <div style={{ fontSize: 13.5, color: COLORS.secondary, opacity: 0.7 }}>
+          Choose your game! Minimal, fast, and beautiful.
+        </div>
+      </div>
+    );
+  }
 
-  // PUBLIC_INTERFACE
+  // Tic Tac Toe mode select
   function GameMenu() {
     return (
       <div className="ttt-menu" style={{ marginBottom: 32 }}>
@@ -173,11 +187,17 @@ function App() {
             2 Player Local
           </button>
         </div>
+        <button
+          className="ttt-btn ttt-btn-link"
+          style={{ marginTop: 22, fontSize: 15, textDecoration: "underline", background: "none", color: COLORS.secondary }}
+          onClick={() => setAppScreen("menu")}
+        >
+          ← Back to Main Menu
+        </button>
       </div>
     );
   }
 
-  // PUBLIC_INTERFACE
   function GameStatus() {
     let msg;
     if (status === "Draw!") msg = "It's a draw!";
@@ -190,6 +210,19 @@ function App() {
       </div>
     );
   }
+
+  const Board = () => (
+    <div className="ttt-board" role="grid" aria-label="Game board">
+      {[0, 1, 2].map((r) => (
+        <div className="ttt-row" key={"row" + r} role="row">
+          {[0, 1, 2].map((c) => renderSquare(r * 3 + c))}
+        </div>
+      ))}
+      {animWinLine && (
+        <div className={`ttt-anim-line ttt-line-${animWinLine[0]}-${animWinLine[2]}`} />
+      )}
+    </div>
+  );
 
   // Main render
   return (
@@ -209,51 +242,72 @@ function App() {
       </header>
 
       <main className="ttt-main">
-        {!gameMode ? (
-          <GameMenu />
-        ) : (
-          <div className="ttt-game-wrapper">
-            <h2 className="ttt-subtitle" style={{ color: COLORS.primary, marginBottom: 12 }}>
-              {gameMode === "ai" ? "Single Player (vs AI)" : "Local Multiplayer"}
-            </h2>
-            <GameStatus />
-            <Board />
-            {(status || board.every(Boolean)) && (
+        {appScreen === "menu" && (
+          <MainMenu />
+        )}
+        {appScreen === "ttt" && (
+          !gameMode ? (
+            <GameMenu />
+          ) : (
+            <div className="ttt-game-wrapper">
+              <h2 className="ttt-subtitle" style={{ color: COLORS.primary, marginBottom: 12 }}>
+                {gameMode === "ai" ? "Single Player (vs AI)" : "Local Multiplayer"}
+              </h2>
+              <GameStatus />
+              <Board />
+              {(status || board.every(Boolean)) && (
+                <button
+                  className="ttt-btn"
+                  style={{
+                    background: COLORS.accent,
+                    color: "#222",
+                    marginTop: 20,
+                    fontWeight: 600,
+                    boxShadow: "0 1px 4px rgba(32,32,60,0.10)",
+                  }}
+                  onClick={restartGame}
+                >
+                  Restart Game
+                </button>
+              )}
               <button
-                className="ttt-btn"
+                className="ttt-btn ttt-btn-link"
                 style={{
-                  background: COLORS.accent,
-                  color: "#222",
+                  color: COLORS.secondary,
                   marginTop: 20,
-                  fontWeight: 600,
-                  boxShadow: "0 1px 4px rgba(32,32,60,0.10)",
+                  background: "none",
+                  border: "none",
+                  fontSize: 15,
+                  textDecoration: "underline",
+                  cursor: "pointer",
                 }}
-                onClick={restartGame}
+                onClick={() => {
+                  setGameMode(null);
+                }}
               >
-                Restart Game
+                ← Back to Mode Select
               </button>
-            )}
-            <button
-              className="ttt-btn ttt-btn-link"
-              style={{
-                color: COLORS.secondary,
-                marginTop: 20,
-                background: "none",
-                border: "none",
-                fontSize: 15,
-                textDecoration: "underline",
-                cursor: "pointer",
-              }}
-              onClick={() => startNewGame(null)}
-            >
-              ← Back to Mode Select
-            </button>
+            </div>
+          )
+        )}
+        {appScreen === "snl" && (
+          <div>
+            <div style={{ maxWidth: 400, width: "100%", margin: "0 auto" }}>
+              <SnakeLadderGame />
+            </div>
+            <div style={{ textAlign: "center", margin: "16px 0 0 0" }}>
+              <button
+                className="ttt-btn ttt-btn-link"
+                style={{ fontSize: 15, textDecoration: "underline", background: "none", color: COLORS.secondary }}
+                onClick={() => setAppScreen("menu")}
+              >← Back to Main Menu</button>
+            </div>
           </div>
         )}
       </main>
       <footer className="ttt-footer">
         <span style={{ color: COLORS.secondary, fontSize: 13, opacity: 0.7 }}>
-          &copy; {new Date().getFullYear()} Tic Tac Toe Arena
+          &copy; {new Date().getFullYear()} Game Arena
         </span>
       </footer>
     </div>
